@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <title>FillWords</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="game.css">
+</head>
+
+<body>
+  <div id="app">
+    <!-- Background Decor (Matches Dark Ocean Theme) -->
+    <div id="bg-grid"></div>
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+
+    <!-- Menu Screen -->
+    <div id="menu-screen" class="screen active">
+      <div class="menu-header">
+        <div class="game-logo">FillWords</div>
+        <div class="game-tagline">Find hidden words, one swipe at a time.</div>
+        <button id="sound-toggle-menu" class="sound-toggle" aria-label="Toggle sound">
+          <svg id="sound-icon-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <span id="sound-label-menu">Sound On</span>
+          <div class="volume-slider-container">
+            <input type="range" id="volume-slider-menu" min="0" max="1" step="0.01" value="0.25">
+          </div>
+        </button>
+      </div>
+      <div id="category-grid" class="category-grid"></div>
+    </div>
+
+    <!-- Level Select -->
+    <div id="level-screen" class="screen">
+      <div class="screen-topbar">
+        <button id="back-to-menu" class="back-btn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+          Categories
+        </button>
+      </div>
+      <div class="level-screen-header">
+        <h2 id="level-cat-name"></h2>
+        <p id="level-cat-desc" class="level-cat-desc">Select a puzzle size</p>
+      </div>
+      <div id="level-grid" class="level-grid"></div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen">
+      <div class="game-toolbar">
+        <button id="back-to-levels" class="back-btn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+          Levels
+        </button>
+        <div class="game-info">
+          <span id="game-level-title" class="game-level-title"></span>
+        </div>
+        <button id="sound-toggle-game" class="sound-toggle icon-only" aria-label="Toggle sound">
+          <svg id="sound-icon-game" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="game-layout">
+        <!-- The Word Search Board -->
+        <div class="board-panel">
+          <div id="board-container">
+            <!-- SVG overlay for drawing swipe lines -->
+            <svg id="swipe-overlay"></svg>
+            <!-- Div grid for letters -->
+            <div id="letter-grid"></div>
+          </div>
+        </div>
+
+        <!-- The Words to Find -->
+        <div class="word-list-panel">
+          <div class="word-list-header">Find the words:</div>
+          <div id="word-list"></div>
+        </div>
+      </div>
+
+      <!-- Tutorial Overlay -->
+      <div id="game-tutorial" style="display: none;">
+        <div class="tutorial-text" id="tutorial-text">Swipe to connect words!</div>
+        <svg class="tutorial-hand" id="tutorial-hand" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"></path>
+          <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"></path>
+          <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"></path>
+          <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15">
+          </path>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Win Screen -->
+    <div id="win-screen" class="screen">
+      <div class="win-content">
+        <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
+        <div class="win-check">
+          <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+            <circle cx="28" cy="28" r="26" stroke="#2dd4a8" stroke-width="2.5" />
+            <path d="M17 28L24 35L39 20" stroke="#2dd4a8" stroke-width="3" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+        </div>
+        <div class="win-title">Level Complete!</div>
+        <div class="win-stats">
+          <span id="win-words-found" class="win-stat-value">0</span> words found
+        </div>
+        <div class="win-actions">
+          <button id="next-level" class="btn-game btn-primary-game">Next Level</button>
+          <button id="play-again" class="btn-game btn-outline-game">Play Again</button>
+          <button id="back-to-menu-win" class="btn-game btn-outline-game">Menu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script type="module" src="game.js"></script>
+</body>
+
+</html>
