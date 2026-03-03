@@ -22,23 +22,44 @@
 
     <!-- Menu Screen -->
     <div id="menu-screen" class="screen active">
-      <div class="menu-header">
-        <div class="game-logo">FillWords</div>
-        <div class="game-tagline">Find hidden words, one swipe at a time.</div>
-        <button id="sound-toggle-menu" class="sound-toggle" aria-label="Toggle sound">
-          <svg id="sound-icon-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-          </svg>
-          <span id="sound-label-menu">Sound On</span>
-          <div class="volume-slider-container">
-            <input type="range" id="volume-slider-menu" min="0" max="1" step="0.01" value="0.25">
-          </div>
+
+      <!-- Centered hero content -->
+      <div class="menu-center">
+
+        <!-- Brand -->
+        <div class="menu-brand">
+          <div class="menu-brand-icon">F</div>
+          <h1 class="menu-brand-title">FillWords</h1>
+          <p class="menu-brand-sub">Daily word puzzles</p>
+        </div>
+
+        <!-- Hero Play Button (POTD) -->
+        <button class="menu-play-btn" id="potd-play-btn">
+          <span class="menu-play-label" id="potd-title">Play</span>
+          <span class="menu-play-meta" id="potd-meta"></span>
         </button>
+
+        <!-- Mini stats -->
+        <div class="menu-stats">
+          <div class="menu-stat"><span class="menu-stat-val" id="stat-levels">0</span> played</div>
+          <div class="menu-stat-dot"></div>
+          <div class="menu-stat"><span class="menu-stat-val" id="stat-words">0</span> words</div>
+          <div class="menu-stat-dot"></div>
+          <div class="menu-stat"><span class="menu-stat-val" id="stat-streak">0</span> streak</div>
+        </div>
+
+        <!-- Divider -->
+        <div class="menu-divider">
+          <span class="menu-divider-line"></span>
+          <span class="menu-divider-text">or browse categories</span>
+          <span class="menu-divider-line"></span>
+        </div>
+
+        <!-- Categories (inside center block now) -->
+        <div id="category-grid" class="menu-cats"></div>
+
       </div>
-      <div id="category-grid" class="category-grid"></div>
+
     </div>
 
     <!-- Level Select -->
@@ -83,6 +104,11 @@
       </div>
 
       <div class="game-layout">
+        <!-- The Words to Find (Top Tray) -->
+        <div class="word-list-panel">
+          <div id="word-list"></div>
+        </div>
+
         <!-- The Word Search Board -->
         <div class="board-panel">
           <div id="board-container">
@@ -91,12 +117,6 @@
             <!-- Div grid for letters -->
             <div id="letter-grid"></div>
           </div>
-        </div>
-
-        <!-- The Words to Find -->
-        <div class="word-list-panel">
-          <div class="word-list-header">Find the words:</div>
-          <div id="word-list"></div>
         </div>
       </div>
 
@@ -119,9 +139,9 @@
       <div class="win-content">
         <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
         <div class="win-check">
-          <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-            <circle cx="28" cy="28" r="26" stroke="#2dd4a8" stroke-width="2.5" />
-            <path d="M17 28L24 35L39 20" stroke="#2dd4a8" stroke-width="3" stroke-linecap="round"
+          <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+            <circle cx="30" cy="30" r="28" fill="#FFD70022" stroke="#FFD700" stroke-width="2.5" />
+            <path d="M18 30L26 38L42 22" stroke="#0e7490" stroke-width="3.5" stroke-linecap="round"
               stroke-linejoin="round" />
           </svg>
         </div>

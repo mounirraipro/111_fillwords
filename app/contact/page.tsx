@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import AdSlot from '../components/AdSlot';
 
-const SUPPORT_EMAIL = 'hello@fillwords.online';
+const SUPPORT_EMAIL = 'contact@fillwords.com';
 
 export default function ContactPage() {
     const [submitted, setSubmitted] = useState(false);

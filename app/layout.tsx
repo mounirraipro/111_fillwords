@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
 import Script from 'next/script';
-import { Inter, Outfit } from "next/font/google";
+import { Lora, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 
-const inter = Inter({
+const lora = Lora({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-sans", // We'll keep the variable name generic or change it
   display: "swap",
 });
 
-const outfit = Outfit({
+const playfair = Playfair_Display({
   subsets: ["latin"],
-  variable: "--font-outfit",
+  variable: "--font-display",
   display: "swap",
 });
 
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   authors: [{ name: "FillWords Team" }],
   creator: "FillWords",
   publisher: "FillWords",
-  metadataBase: new URL("https://fillwords.online"),
+  metadataBase: new URL("https://fillwords.com"),
   alternates: {
     canonical: "/",
   },
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     title: "FillWords – Free Online Word Puzzle Game",
     description:
       "Play FillWords online! Swipe through letters to find hidden words. 500+ words across 5 categories.",
-    url: "https://fillwords.online",
+    url: "https://fillwords.com",
   },
   twitter: {
     card: "summary_large_image",
@@ -85,7 +85,7 @@ export default function RootLayout({
   const publisherId = getPublisherId();
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {publisherId ? (
           <Script
@@ -103,19 +103,19 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "WebSite",
               name: "FillWords",
-              url: "https://fillwords.online",
+              url: "https://fillwords.com",
               description:
                 "Free online word puzzle game. Swipe through a grid of letters to find hidden words across 5 categories.",
               potentialAction: {
                 "@type": "SearchAction",
-                target: "https://fillwords.online/categories?q={search_term_string}",
+                target: "https://fillwords.com/categories?q={search_term_string}",
                 "query-input": "required name=search_term_string",
               },
             }),
           }}
         />
       </head>
-      <body className={`${inter.variable} ${outfit.variable}`}>
+      <body className={`${lora.variable} ${playfair.variable}`}>
         <Header />
         <main>{children}</main>
         <Footer />

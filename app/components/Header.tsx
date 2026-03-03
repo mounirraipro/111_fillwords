@@ -30,7 +30,7 @@ export default function Header() {
           ))}
         </div>
 
-        <Link href="/#game" className="island-cta">
+        <Link href="/play" className="island-cta">
           Play Now
         </Link>
 
@@ -54,7 +54,7 @@ export default function Header() {
               {link.label}
             </Link>
           ))}
-          <Link href="/#game" onClick={() => setIsOpen(false)}>
+          <Link href="/play" onClick={() => setIsOpen(false)}>
             Play Now
           </Link>
         </div>

@@ -55,7 +55,7 @@ class ConfettiSystem {
     this.ctx = canvas.getContext('2d');
     this.particles = [];
     this.running = false;
-    this.colors = ['#2dd4a8', '#f0f2f8', '#26b892', '#5b6494'];
+    this.colors = ['#FFD700', '#0ea5e9', '#e6b800', '#0e7490', '#ffffff'];
   }
   resize() {
     const rect = this.canvas.parentElement.getBoundingClientRect();
@@ -106,94 +106,121 @@ class ConfettiSystem {
 }
 
 // ==========================================
-// WORD GRID GENERATOR
+// BOARD GENERATOR — Robust with diagonal bias
+// Retries entire board if any word can't be placed
 // ==========================================
 function generateBoard(cols, rows, words) {
-    const dirs = [
-        [0, 1], [1, 0], [1, 1], [-1, 1],
-        [0, -1], [-1, 0], [-1, -1], [1, -1]
-    ];
-    
-    // Sort words by length descending
-    const sortedWords = [...words].sort((a,b) => b.length - a.length);
+  // 8 directions: 4 diagonals + 4 cardinal
+  const DIAGS = [[1,1],[-1,1],[1,-1],[-1,-1]];
+  const CARDS = [[0,1],[1,0],[0,-1],[-1,0]];
 
-    let bestGrid = null;
-    let bestPlacedWords = [];
-    let allowOverlap = false;
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
 
-    for (let pass = 0; pass < 2; pass++) {
-        if (pass === 1) allowOverlap = true; // Fallback: allow overlapping letters if needed
+  // Build a direction list with strong diagonal preference:
+  // 70% chance diagonals come first
+  function getDirs() {
+    const d = shuffle([...DIAGS]);
+    const c = shuffle([...CARDS]);
+    if (Math.random() < 0.7) return [...d, ...c];
+    return shuffle([...d, ...c]);
+  }
 
-        for (let boardAttempt = 0; boardAttempt < 200; boardAttempt++) {
-            const grid = Array(rows).fill(null).map(() => Array(cols).fill(''));
-            const placedWords = [];
-            let allPlaced = true;
+  function tryGenerate() {
+    const grid = Array(rows).fill(null).map(() => Array(cols).fill(''));
+    const sortedWords = [...words].sort((a, b) => b.length - a.length);
+    const placedWords = [];
 
-            for (let word of sortedWords) {
-                word = word.toUpperCase();
-                let placed = false;
-                let attempts = 0;
-                
-                while (!placed && attempts < 200) {
-                    const dir = dirs[Math.floor(Math.random() * dirs.length)];
-                    const r = Math.floor(Math.random() * rows);
-                    const c = Math.floor(Math.random() * cols);
-                    
-                    const er = r + dir[0] * (word.length - 1);
-                    const ec = c + dir[1] * (word.length - 1);
-                    
-                    if (er >= 0 && er < rows && ec >= 0 && ec < cols) {
-                        let canPlace = true;
-                        for (let i = 0; i < word.length; i++) {
-                            const char = grid[r + dir[0]*i][c + dir[1]*i];
-                            if (char !== '' && (!allowOverlap || char !== word[i])) {
-                                canPlace = false; break;
-                            }
-                        }
-                        if (canPlace) {
-                            const positions = [];
-                            for (let i = 0; i < word.length; i++) {
-                                grid[r + dir[0]*i][c + dir[1]*i] = word[i];
-                                positions.push({ r: r + dir[0]*i, c: c + dir[1]*i });
-                            }
-                            placedWords.push({ word, positions });
-                            placed = true;
-                        }
-                    }
-                    attempts++;
-                }
-                
-                if (!placed) {
-                    allPlaced = false;
-                    break;
-                }
-            }
-
-            if (allPlaced) {
-                bestGrid = grid;
-                bestPlacedWords = placedWords;
-                break;
-            } else if (placedWords.length > bestPlacedWords.length) {
-                bestGrid = grid;
-                bestPlacedWords = placedWords;
-            }
-        }
-        
-        if (bestPlacedWords.length === words.length) {
-            break;
-        }
+    for (const word of sortedWords) {
+      const w = word.toUpperCase();
+      const placed = tryPlaceWord(grid, w, cols, rows);
+      if (!placed) return null; // total failure — retry entire board
+      placedWords.push({ word: w, positions: placed });
     }
 
-    // Fill blanks
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    for(let r=0; r<rows; r++){
-        for(let c=0; c<cols; c++){
-            if(bestGrid[r][c] === '') {
-                bestGrid[r][c] = alphabet[Math.floor(Math.random() * alphabet.length)];
-            }
+    return { grid, placedWords };
+  }
+
+  function tryPlaceWord(grid, word, cols, rows) {
+    // Build all possible start positions, shuffled for variety
+    const starts = [];
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++)
+        starts.push([r, c]);
+    shuffle(starts);
+
+    const directions = getDirs();
+
+    for (const [r, c] of starts) {
+      for (const [dr, dc] of directions) {
+        const endR = r + dr * (word.length - 1);
+        const endC = c + dc * (word.length - 1);
+        // Bounds check
+        if (endR < 0 || endR >= rows || endC < 0 || endC >= cols) continue;
+
+        // Check all cells: must be empty or already have the same letter
+        let valid = true;
+        for (let i = 0; i < word.length; i++) {
+          const cell = grid[r + dr * i][c + dc * i];
+          if (cell !== '' && cell !== word[i]) { valid = false; break; }
         }
+        if (!valid) continue;
+
+        // Place the word
+        const positions = [];
+        for (let i = 0; i < word.length; i++) {
+          grid[r + dr * i][c + dc * i] = word[i];
+          positions.push({ r: r + dr * i, c: c + dc * i });
+        }
+        return positions;
+      }
     }
-    return { grid: bestGrid, placedWords: bestPlacedWords };
+    return null;
+  }
+
+  // Retry up to 50 times to get a valid board
+  let result = null;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    result = tryGenerate();
+    if (result) break;
+  }
+
+  // Absolute fallback (should never happen with reasonable grid sizes)
+  if (!result) {
+    result = { grid: Array(rows).fill(null).map(() => Array(cols).fill('')), placedWords: [] };
+    const sortedWords = [...words].sort((a, b) => b.length - a.length);
+    // Force horizontal placements as last resort
+    let r = 0, c = 0;
+    for (const word of sortedWords) {
+      const w = word.toUpperCase();
+      const positions = [];
+      for (let i = 0; i < w.length; i++) {
+        if (c >= cols) { c = 0; r++; }
+        if (r >= rows) break;
+        result.grid[r][c] = w[i];
+        positions.push({ r, c });
+        c++;
+      }
+      result.placedWords.push({ word: w, positions });
+    }
+  }
+
+  // Fill blanks with rare letters
+  const RARE = "JQXZKVWYBFHM";
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (result.grid[r][c] === '') {
+        result.grid[r][c] = RARE[Math.floor(Math.random() * RARE.length)];
+      }
+    }
+  }
+
+  return result;
 }
 
 // ==========================================
@@ -252,12 +279,48 @@ class GameEngine {
       const saved = localStorage.getItem('fillwords_progress');
       if (saved) return JSON.parse(saved);
     } catch(e) {}
-    // Default: first level of each category unlocked
     const progress = {};
     CATEGORIES.forEach(cat => {
       progress[cat.slug] = [cat.levels[0].id];
     });
     return progress;
+  }
+
+  loadStats() {
+    try {
+      const saved = localStorage.getItem('fillwords_stats');
+      if (saved) return JSON.parse(saved);
+    } catch(e) {}
+    return { levelsCompleted: 0, wordsFound: 0, lastPlayedDate: null, streak: 0 };
+  }
+
+  saveStats(stats) {
+    localStorage.setItem('fillwords_stats', JSON.stringify(stats));
+  }
+
+  updateStats(wordsFoundInLevel) {
+    const stats = this.loadStats();
+    stats.levelsCompleted = (stats.levelsCompleted || 0) + 1;
+    stats.wordsFound = (stats.wordsFound || 0) + wordsFoundInLevel;
+    const today = new Date().toISOString().split('T')[0];
+    if (stats.lastPlayedDate === today) {
+      // already played today, streak stays
+    } else if (stats.lastPlayedDate === new Date(Date.now() - 86400000).toISOString().split('T')[0]) {
+      stats.streak = (stats.streak || 0) + 1;
+    } else {
+      stats.streak = 1;
+    }
+    stats.lastPlayedDate = today;
+    this.saveStats(stats);
+  }
+
+  getDailyPuzzle() {
+    // Seed by day: YYYYMMDD → index into all levels across all categories
+    const today = new Date();
+    const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    const allLevels = CATEGORIES.flatMap(cat => cat.levels.map(lvl => ({ cat, lvl })));
+    const idx = seed % allLevels.length;
+    return allLevels[idx];
   }
 
   saveProgress() {
@@ -356,31 +419,53 @@ class GameEngine {
 
   // --- Rendering UI --- //
   renderMenu() {
+    // Populate inline stats
+    const stats = this.loadStats();
+    const el = (id) => document.getElementById(id);
+    if (el('stat-levels')) el('stat-levels').textContent = stats.levelsCompleted || 0;
+    if (el('stat-words')) el('stat-words').textContent = stats.wordsFound || 0;
+    if (el('stat-streak')) el('stat-streak').textContent = stats.streak || 0;
+
+    // Hero play button = Puzzle of the Day
+    const daily = this.getDailyPuzzle();
+    if (el('potd-title')) el('potd-title').textContent = `▶  Play Today's Puzzle`;
+    if (el('potd-meta')) el('potd-meta').textContent = `${daily.cat.name} · ${daily.lvl.title} · ${daily.lvl.difficulty}`;
+    const potdBtn = el('potd-play-btn');
+    if (potdBtn) {
+      potdBtn.onclick = () => {
+        this.sound.init();
+        this.sound.click();
+        if (!this.state.unlockedLevels[daily.cat.slug]) this.state.unlockedLevels[daily.cat.slug] = [];
+        if (!this.state.unlockedLevels[daily.cat.slug].includes(daily.lvl.id)) {
+          this.state.unlockedLevels[daily.cat.slug].push(daily.lvl.id);
+          this.saveProgress();
+        }
+        this.loadLevel(daily.lvl);
+      };
+    }
+
+    // Category pills
     this.catGrid.innerHTML = '';
     CATEGORIES.forEach(cat => {
-      const card = document.createElement('div');
-      card.className = 'category-card';
-      // Remove images, use color gradient instead for clean styling
-      card.style.background = `linear-gradient(135deg, ${cat.color}22, rgba(19, 23, 41, 0.9))`;
-      card.style.borderTop = `2px solid ${cat.color}`;
-      
-      card.innerHTML = `
+      const pill = document.createElement('div');
+      pill.className = 'category-card';
+      pill.innerHTML = `
         <div class="cat-body">
-          <div class="cat-name">${cat.name}</div>
-          <div class="cat-meta">${cat.levels.length} Levels</div>
+          <span class="cat-emoji">${cat.emoji || '🔤'}</span>
+          <span class="cat-name">${cat.name}</span>
         </div>
       `;
-      card.addEventListener('click', () => {
+      pill.addEventListener('click', () => {
         this.sound.init();
         this.sound.click();
         this.renderLevelSelect(cat);
       });
-      this.catGrid.appendChild(card);
+      this.catGrid.appendChild(pill);
     });
   }
 
   renderLevelSelect(cat) {
-    document.getElementById('level-cat-name').textContent = cat.name;
+    document.getElementById('level-cat-name').textContent = `${cat.emoji || ''} ${cat.name}`;
     this.lvlGrid.innerHTML = '';
     
     cat.levels.forEach((lvl, idx) => {
@@ -390,7 +475,7 @@ class GameEngine {
       card.className = `level-card ${isUnlocked ? '' : 'locked'}`;
       card.innerHTML = `
         <div class="level-title">
-          ${isUnlocked ? '' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:0.5rem; vertical-align:middle"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>'}
+          ${isUnlocked ? '' : '🔒 '}
           ${lvl.title}
         </div>
         <div class="level-meta-right">
@@ -717,6 +802,8 @@ class GameEngine {
 
   checkWin() {
     if (this.state.foundWords.size === this.state.level.words.length) {
+        // Save stats
+        this.updateStats(this.state.foundWords.size);
         // Unlock next level
         this.unlockNextLevel(this.state.level);
         if (this._idleTimer) clearTimeout(this._idleTimer);
@@ -727,7 +814,6 @@ class GameEngine {
         // Make all tiles fall
         const tiles = document.querySelectorAll('.letter-tile');
         tiles.forEach((tile, i) => {
-            // Random delay for organic fall
             setTimeout(() => {
                 tile.classList.add('tile-fall');
             }, Math.random() * 400);
