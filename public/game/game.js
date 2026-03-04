@@ -294,6 +294,9 @@ function generateBoard(cols, rows, words) {
 // ==========================================
 // GAME ENGINE
 // ==========================================
+// Color palette for found words (cycles through these)
+const WORD_COLORS = ['yellow', 'purple', 'lightblue'];
+
 class GameEngine {
   constructor() {
     this.sound = new SoundEngine();
@@ -302,6 +305,7 @@ class GameEngine {
         level: null,
         board: null, // {grid, placedWords}
         foundWords: new Set(),
+        tileWordCounts: {}, // tracks how many found words use each tile: "r,c" -> count
         
         // Interaction state
         isDragging: false,
@@ -573,6 +577,7 @@ class GameEngine {
     this.state.level = level;
     this.state.foundWords.clear();
     this.state.svgLines = [];
+    this.state.tileWordCounts = {};
     this.state.board = generateBoard(level.cols, level.rows, level.words);
     
     // Use actual board dimensions (may be auto-expanded for long words)
@@ -798,16 +803,30 @@ class GameEngine {
         this.sound.found();
         this.state.foundWords.add(text);
         
-        // Mark UI list
-        document.getElementById(`word-${text}`).classList.add('found');
+        // Assign rotating color
+        const colorIdx = this.state.svgLines.length % WORD_COLORS.length;
+        const colorClass = `word-color-${WORD_COLORS[colorIdx]}`;
         
-        // Save full path in SVG (polyline for non-linear paths)
-        this.state.svgLines.push({ path: [...this.state.currentPath] });
+        // Mark UI list with color
+        const wordEl = document.getElementById(`word-${text}`);
+        wordEl.classList.add('found', colorClass);
         
-        // Trigger tile animations
+        // Save full path in SVG with color
+        this.state.svgLines.push({ path: [...this.state.currentPath], colorIndex: colorIdx });
+        
+        // Trigger tile animations with color
         this.state.currentPath.forEach(p => {
+          const key = `${p.r},${p.c}`;
+          this.state.tileWordCounts[key] = (this.state.tileWordCounts[key] || 0) + 1;
           const el = this.getTileElement(p.r, p.c);
-          el.classList.add('found');
+          
+          if (this.state.tileWordCounts[key] >= 2) {
+            // Shared tile: remove any single-word color and apply shared style
+            el.classList.remove('word-color-yellow', 'word-color-purple', 'word-color-lightblue');
+            el.classList.add('found', 'word-shared');
+          } else {
+            el.classList.add('found', colorClass);
+          }
           gsap.fromTo(el, {scale: 1.2}, {scale: 1, duration: 0.3, ease: 'bounce.out'});
         });
         
@@ -849,14 +868,15 @@ class GameEngine {
   updateSVG() {
     let html = '';
     
-    // Render permanently found lines as polylines
+    // Render permanently found lines as polylines with rotating colors
     this.state.svgLines.forEach(line => {
       const points = line.path.map(p => {
         const c = this.getTileCenter(p.r, p.c);
         return c ? `${c.x},${c.y}` : null;
       }).filter(Boolean);
       if (points.length >= 2) {
-        html += `<polyline points="${points.join(' ')}" class="found-line"></polyline>`;
+        const colorClass = `found-line-${WORD_COLORS[line.colorIndex]}`;
+        html += `<polyline points="${points.join(' ')}" class="found-line ${colorClass}"></polyline>`;
       }
     });
     

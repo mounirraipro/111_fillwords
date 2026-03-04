@@ -707,19 +707,85 @@ body {
 }
 
 .found-line {
-  stroke: rgba(14, 165, 233, 0.25);
   stroke-width: 14;
   stroke-linecap: round;
   stroke-linejoin: round;
   fill: none;
 }
 
-/* Purple crossing state for tiles */
+/* Found line color variants */
+.found-line-yellow { stroke: rgba(255, 215, 0, 0.45); }
+.found-line-purple { stroke: rgba(168, 85, 247, 0.4); }
+.found-line-lightblue { stroke: rgba(56, 189, 248, 0.4); }
+
+/* Purple crossing state for tiles (during active swipe) */
 .letter-tile.selected.crossing {
   background: #e9d5ff;
   border-color: #a855f7;
   color: #6b21a8;
   box-shadow: 0 4px 0 rgba(168, 85, 247, 0.3);
+}
+
+/* ── Found tile color variants ── */
+.letter-tile.found.word-color-yellow {
+  background: #fef9c3;
+  color: #854d0e;
+  border-color: rgba(234, 179, 8, 0.4);
+  box-shadow: 0 2px 0 rgba(234, 179, 8, 0.2);
+}
+
+.letter-tile.found.word-color-purple {
+  background: #f3e8ff;
+  color: #6b21a8;
+  border-color: rgba(168, 85, 247, 0.4);
+  box-shadow: 0 2px 0 rgba(168, 85, 247, 0.2);
+}
+
+.letter-tile.found.word-color-lightblue {
+  background: #e0f2fe;
+  color: #0369a1;
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 2px 0 rgba(56, 189, 248, 0.2);
+}
+
+/* ── Word list item color variants ── */
+.word-item.found.word-color-yellow {
+  background: var(--yellow);
+  border-color: var(--yellow-dark);
+  color: var(--teal-dark);
+}
+
+.word-item.found.word-color-purple {
+  background: #d8b4fe;
+  border-color: #a855f7;
+  color: #581c87;
+}
+
+.word-item.found.word-color-lightblue {
+  background: #7dd3fc;
+  border-color: #38bdf8;
+  color: #0c4a6e;
+}
+
+/* ── Shared tile (used by 2+ words) ── */
+.letter-tile.found.word-shared {
+  background: linear-gradient(135deg, #fef9c3 0%, #f3e8ff 50%, #e0f2fe 100%);
+  border: 2.5px solid #a855f7;
+  color: #1e293b;
+  font-weight: 900;
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.3), 0 2px 0 rgba(14, 116, 144, 0.15);
+  position: relative;
+}
+
+/* Small diamond indicator on shared tiles */
+.letter-tile.found.word-shared::after {
+  content: '◆';
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font-size: 0.45rem;
+  color: #a855f7;
+  line-height: 1;
 }
 
 /* ==========================================
