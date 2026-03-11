@@ -410,6 +410,13 @@ const DEFAULT_POWERS = {
   hint: 3
 };
 
+const DAILY_MODIFIERS = [
+  { key: 'double-score', name: 'Double Score', shortLabel: '2x score', description: 'Every found word is worth double points.' },
+  { key: 'combo-rush', name: 'Combo Rush', shortLabel: 'longer combos', description: 'Combos last longer and ramp faster.' },
+  { key: 'frozen-start', name: 'Frozen Start', shortLabel: '12s freeze', description: 'The timer is frozen for the first 12 seconds.' },
+  { key: 'no-hints', name: 'No Hints', shortLabel: 'hint lock', description: 'Hint power is disabled, but the clean-run bonus is bigger.' }
+];
+
 class ArcadeEngine {
   constructor() {
     this.sound = new SoundEngine();
@@ -420,6 +427,7 @@ class ArcadeEngine {
         board: null,
         foundWords: new Set(),
         tileWordCounts: {},
+        levelRecords: this.loadLevelRecords(),
         
         isDragging: false,
         startTile: null,
@@ -433,6 +441,7 @@ class ArcadeEngine {
         score: 0,
         combo: 0,
         comboMultiplier: 1,
+        maxCombo: 0,
         timeLeft: 0,
         timerInterval: null,
         timerFrozen: false,
@@ -441,6 +450,12 @@ class ArcadeEngine {
         activePower: null,
         powers: { ...DEFAULT_POWERS },
         hintsUsed: 0,
+        lastWinResult: null,
+        currentCategory: null,
+        activeModifier: null,
+        isDailyRun: false,
+        scoreMultiplier: 1,
+        comboTimeoutMs: 5000,
         
         unlockedLevels: this.loadProgress(),
     };
@@ -453,6 +468,7 @@ class ArcadeEngine {
   initDOM() {
     this.screens = {
         menu: document.getElementById('menu-screen'),
+        collections: document.getElementById('collection-screen'),
         level: document.getElementById('level-screen'),
         game: document.getElementById('game-screen'),
         gameover: document.getElementById('gameover-screen'),
@@ -460,6 +476,7 @@ class ArcadeEngine {
     };
     
     this.catGrid = document.getElementById('category-grid');
+    this.collectionGrid = document.getElementById('collection-grid');
     this.lvlGrid = document.getElementById('level-grid');
     this.gridEl = document.getElementById('letter-grid');
     this.progressDots = document.getElementById('progress-dots');
@@ -471,6 +488,7 @@ class ArcadeEngine {
     this.comboText = document.getElementById('combo-text');
     this.timerDisplay = document.getElementById('timer-display');
     this.timerVal = document.getElementById('timer-value');
+    this.dailyModifierBanner = document.getElementById('daily-modifier-banner');
     
     this.powerBtns = {
       blast: document.getElementById('pw-blast'),
@@ -489,8 +507,13 @@ class ArcadeEngine {
     } catch(e) {}
     const progress = { ...saved };
     CATEGORIES.forEach(cat => {
-      if (!progress[cat.slug] || !Array.isArray(progress[cat.slug]) || progress[cat.slug].length === 0) {
-        progress[cat.slug] = [cat.levels[0].id];
+      const firstLevelId = cat.levels[0]?.id;
+      if (!Array.isArray(progress[cat.slug])) {
+        progress[cat.slug] = firstLevelId != null ? [firstLevelId] : [];
+        return;
+      }
+      if (firstLevelId != null && !progress[cat.slug].includes(firstLevelId)) {
+        progress[cat.slug].unshift(firstLevelId);
       }
     });
     return progress;
@@ -506,6 +529,172 @@ class ArcadeEngine {
 
   saveStats(stats) {
     localStorage.setItem('fillwords_arcade_stats', JSON.stringify(stats));
+  }
+
+  loadLevelRecords() {
+    try {
+      const saved = localStorage.getItem('fillwords_arcade_level_records');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {};
+  }
+
+  saveLevelRecords() {
+    localStorage.setItem('fillwords_arcade_level_records', JSON.stringify(this.state.levelRecords));
+  }
+
+  getLevelRecord(levelId) {
+    return this.state.levelRecords[levelId] || null;
+  }
+
+  getArcadeTargetScores(level) {
+    const words = level.words.length;
+    const baseTime = level.difficulty.toLowerCase() === 'easy'
+      ? 120
+      : level.difficulty.toLowerCase() === 'medium'
+        ? 90
+        : level.difficulty.toLowerCase() === 'hard'
+          ? 75
+          : 60;
+
+    return {
+      silver: words * 120 + baseTime * 4 + 500,
+      gold: words * 160 + baseTime * 7 + 650
+    };
+  }
+
+  calculateArcadeStars(level, result) {
+    const targets = this.getArcadeTargetScores(level);
+    if (result.finalScore >= targets.gold && result.hintsUsed === 0) return 3;
+    if (result.finalScore >= targets.silver) return 2;
+    return 1;
+  }
+
+  recordLevelResult(level, result) {
+    const previous = this.getLevelRecord(level.id);
+    const updated = {
+      stars: Math.max(previous?.stars || 0, result.stars),
+      bestScore: Math.max(previous?.bestScore || 0, result.finalScore),
+      bestCombo: Math.max(previous?.bestCombo || 0, result.maxCombo),
+      bestTimeLeft: Math.max(previous?.bestTimeLeft || 0, result.timeLeft),
+      plays: (previous?.plays || 0) + 1,
+      lastPlayedAt: Date.now()
+    };
+
+    this.state.levelRecords[level.id] = updated;
+    this.saveLevelRecords();
+
+    return {
+      record: updated,
+      isNewBestScore: !previous || result.finalScore > (previous.bestScore || 0),
+      isNewStarRecord: result.stars > (previous?.stars || 0)
+    };
+  }
+
+  renderStars(count) {
+    return Array.from({ length: 3 }, (_, index) => {
+      const filled = index < count;
+      return `<span class="star-chip${filled ? ' filled' : ''}">${filled ? '★' : '☆'}</span>`;
+    }).join('');
+  }
+
+  getArcadeReplayLabel(record) {
+    if (!record) return 'Set Your First Score';
+    if (record.stars >= 3) return 'Chase A Higher Score';
+    if (record.stars === 2) return 'Push For Gold';
+    return 'Build A Bigger Combo';
+  }
+
+  getCategoryProgress(cat) {
+    const totalLevels = cat.levels.length;
+    let completedLevels = 0;
+    let earnedStars = 0;
+    let bestScore = 0;
+    let perfectedLevels = 0;
+
+    cat.levels.forEach(level => {
+      const record = this.getLevelRecord(level.id);
+      if (record) {
+        completedLevels++;
+        earnedStars += record.stars || 0;
+        bestScore = Math.max(bestScore, record.bestScore || 0);
+        if ((record.stars || 0) >= 3) perfectedLevels++;
+      }
+    });
+
+    const totalStars = totalLevels * 3;
+    const isComplete = completedLevels === totalLevels;
+    const isPerfected = perfectedLevels === totalLevels && totalLevels > 0;
+    const masteryLabel = isPerfected ? 'Perfected' : isComplete ? 'Mastered' : 'In Progress';
+
+    return {
+      completedLevels,
+      totalLevels,
+      earnedStars,
+      totalStars,
+      bestScore,
+      perfectedLevels,
+      completionPct: Math.round((completedLevels / totalLevels) * 100),
+      isComplete,
+      isPerfected,
+      masteryLabel
+    };
+  }
+
+  getCategoryStatusNote(progress) {
+    if (progress.isPerfected) return 'Collection Perfected';
+    if (progress.isComplete) return 'Collection Mastered';
+    return `${progress.totalLevels - progress.completedLevels} levels left`;
+  }
+
+  renderCategoryMastery(progress) {
+    return [
+      `<span class="mastery-pill">${progress.masteryLabel}</span>`,
+      `<span class="mastery-pill subtle">${progress.perfectedLevels}/${progress.totalLevels} gold</span>`,
+      `<span class="mastery-pill subtle">${progress.earnedStars}/${progress.totalStars} medals</span>`
+    ].join('');
+  }
+
+  renderCollectionShelf() {
+    this.switchScreen('collections');
+    this.collectionGrid.innerHTML = '';
+
+    CATEGORIES.forEach(cat => {
+      this.ensureCategoryUnlocked(cat);
+      const progress = this.getCategoryProgress(cat);
+      const card = document.createElement('button');
+      card.className = `collection-card ${progress.isPerfected ? 'perfected' : ''}`;
+      card.innerHTML = `
+        <div class="collection-top">
+          <div>
+            <div class="collection-title">${cat.emoji || '⚡'} ${cat.name}</div>
+            <div class="collection-status">${progress.masteryLabel}</div>
+          </div>
+          <div class="level-stars">${this.renderStars(Math.min(progress.perfectedLevels, 3))}</div>
+        </div>
+        <div class="cat-progress-bar"><span style="width:${progress.completionPct}%"></span></div>
+        <div class="collection-stats">
+          <span class="collection-stat">${progress.completedLevels}/${progress.totalLevels} cleared</span>
+          <span class="collection-stat">${progress.perfectedLevels}/${progress.totalLevels} gold</span>
+          <span class="collection-stat">${progress.earnedStars}/${progress.totalStars} medals</span>
+        </div>
+      `;
+      card.addEventListener('click', () => {
+        this.sound.click();
+        this.renderLevelSelect(cat);
+      });
+      this.collectionGrid.appendChild(card);
+    });
+  }
+
+  ensureCategoryUnlocked(cat) {
+    if (!cat?.levels?.length) return;
+    if (!this.state.unlockedLevels[cat.slug]) this.state.unlockedLevels[cat.slug] = [];
+    const firstLevelId = cat.levels[0].id;
+    if (!this.state.unlockedLevels[cat.slug].includes(firstLevelId)) {
+      this.state.unlockedLevels[cat.slug].push(firstLevelId);
+      this.saveProgress();
+    }
   }
 
   saveProgress() {
@@ -536,6 +725,52 @@ class ArcadeEngine {
     return allLevels[seed % allLevels.length];
   }
 
+  getDailyChallenge() {
+    const today = new Date();
+    const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    const puzzle = this.getDailyPuzzle();
+    const modifier = DAILY_MODIFIERS[(seed * 7 + 3) % DAILY_MODIFIERS.length];
+    return { ...puzzle, modifier, seed };
+  }
+
+  startDailyChallenge() {
+    const daily = this.getDailyChallenge();
+    if (!this.state.unlockedLevels[daily.cat.slug]) this.state.unlockedLevels[daily.cat.slug] = [];
+    if (!this.state.unlockedLevels[daily.cat.slug].includes(daily.lvl.id)) {
+      this.state.unlockedLevels[daily.cat.slug].push(daily.lvl.id);
+      this.saveProgress();
+    }
+    this.loadLevel(daily.lvl, { isDailyRun: true, modifier: daily.modifier });
+  }
+
+  applyModifierState(modifier) {
+    this.state.activeModifier = modifier || null;
+    this.state.isDailyRun = Boolean(modifier);
+    this.state.scoreMultiplier = modifier?.key === 'double-score' ? 2 : 1;
+    this.state.comboTimeoutMs = modifier?.key === 'combo-rush' ? 8000 : 5000;
+    if (modifier?.key === 'no-hints') {
+      this.state.powers.hint = 0;
+    }
+  }
+
+  updateModifierUI() {
+    if (!this.dailyModifierBanner) return;
+    if (!this.state.activeModifier) {
+      this.dailyModifierBanner.hidden = true;
+      this.dailyModifierBanner.textContent = '';
+      return;
+    }
+
+    this.dailyModifierBanner.hidden = false;
+    this.dailyModifierBanner.textContent = `Daily Modifier: ${this.state.activeModifier.name} - ${this.state.activeModifier.description}`;
+  }
+
+  getCurrentRunOptions() {
+    return this.state.activeModifier
+      ? { isDailyRun: this.state.isDailyRun, modifier: this.state.activeModifier }
+      : {};
+  }
+
   unlockNextLevel(currentLevel) {
     let catSlug = null;
     let nextLvlId = null;
@@ -563,10 +798,18 @@ class ArcadeEngine {
 
   bindEvents() {
     document.getElementById('back-to-menu').addEventListener('click', () => {
-        this.sound.click(); this.switchScreen('menu');
+        this.sound.click(); this.renderMenu();
+    });
+    document.getElementById('open-collection-shelf').addEventListener('click', () => {
+        this.sound.init(); this.sound.click(); this.renderCollectionShelf();
+    });
+    document.getElementById('back-from-collections').addEventListener('click', () => {
+        this.sound.click(); this.renderMenu();
     });
     document.getElementById('back-to-levels').addEventListener('click', () => {
-        this.sound.click(); this.endGame(); this.switchScreen('level');
+        this.sound.click(); this.endGame();
+        if (this.state.currentCategory) this.renderLevelSelect(this.state.currentCategory);
+        else this.renderMenu();
     });
     
     document.getElementById('back-to-menu-win').addEventListener('click', () => {
@@ -577,10 +820,10 @@ class ArcadeEngine {
     });
     
     document.getElementById('play-again').addEventListener('click', () => {
-        this.sound.click(); this.loadLevel(this.state.level);
+        this.sound.click(); this.loadLevel(this.state.level, this.getCurrentRunOptions());
     });
     document.getElementById('retry-level').addEventListener('click', () => {
-        this.sound.click(); this.loadLevel(this.state.level);
+        this.sound.click(); this.loadLevel(this.state.level, this.getCurrentRunOptions());
     });
     document.getElementById('next-level').addEventListener('click', () => {
         this.sound.click();
@@ -608,32 +851,41 @@ class ArcadeEngine {
 
   // --- UI Update Methods --- //
   renderMenu() {
+    this.state.currentCategory = null;
+    this.switchScreen('menu');
     const stats = this.loadStats();
     document.getElementById('stat-levels').textContent = stats.levelsPlayed;
     document.getElementById('stat-highscore').textContent = stats.highestScore;
     document.getElementById('stat-streak').textContent = stats.streak;
 
-    const daily = this.getDailyPuzzle();
-    document.getElementById('potd-meta').textContent = `${daily.cat.name} · ${daily.lvl.title}`;
+    const daily = this.getDailyChallenge();
+    document.getElementById('potd-title').textContent = 'Daily Challenge';
+    document.getElementById('potd-meta').textContent = `${daily.cat.name} · ${daily.lvl.title} · ${daily.modifier.name}`;
+    document.getElementById('potd-modifier').textContent = daily.modifier.description;
     
     document.getElementById('potd-play-btn').onclick = () => {
       this.sound.init(); this.sound.click();
-      if (!this.state.unlockedLevels[daily.cat.slug]) this.state.unlockedLevels[daily.cat.slug] = [];
-      if (!this.state.unlockedLevels[daily.cat.slug].includes(daily.lvl.id)) {
-        this.state.unlockedLevels[daily.cat.slug].push(daily.lvl.id);
-        this.saveProgress();
-      }
-      this.loadLevel(daily.lvl);
+      this.startDailyChallenge();
     };
 
     this.catGrid.innerHTML = '';
     CATEGORIES.forEach(cat => {
+      this.ensureCategoryUnlocked(cat);
+      const progress = this.getCategoryProgress(cat);
       const pill = document.createElement('div');
-      pill.className = 'category-card';
+      pill.className = `category-card ${progress.isPerfected ? 'perfected' : ''}`;
       pill.innerHTML = `
         <div class="cat-body">
           <span class="cat-emoji">${cat.emoji || '⚡'}</span>
-          <span class="cat-name">${cat.name}</span>
+          <div class="cat-copy">
+            <span class="cat-name">${cat.name}</span>
+            <div class="cat-visuals">
+              <div class="cat-progress-bar"><span style="width:${progress.completionPct}%"></span></div>
+              <span class="cat-progress">${progress.completedLevels}/${progress.totalLevels}</span>
+              <span class="cat-stars-mini">${progress.earnedStars}/${progress.totalStars}★</span>
+            </div>
+            <span class="cat-mastery-badge">${this.getCategoryStatusNote(progress)}</span>
+          </div>
         </div>
       `;
       pill.addEventListener('click', () => {
@@ -645,17 +897,34 @@ class ArcadeEngine {
   }
 
   renderLevelSelect(cat) {
+    this.ensureCategoryUnlocked(cat);
+    this.state.currentCategory = cat;
+    const progress = this.getCategoryProgress(cat);
     document.getElementById('level-cat-name').textContent = `${cat.emoji || ''} ${cat.name}`;
+    document.querySelector('.level-cat-desc').textContent = `${progress.completedLevels}/${progress.totalLevels} cleared · ${progress.earnedStars}/${progress.totalStars} medals · best ${progress.bestScore} pts`;
+    document.getElementById('level-cat-mastery').innerHTML = this.renderCategoryMastery(progress);
     this.lvlGrid.innerHTML = '';
     
     cat.levels.forEach((lvl) => {
       const isUnlocked = this.state.unlockedLevels[cat.slug]?.includes(lvl.id);
+      const record = this.getLevelRecord(lvl.id);
+      const bestLine = record?.bestScore
+        ? `<div class="level-best">Best ${record.bestScore} pts</div>`
+        : '<div class="level-best">Unplayed</div>';
+      const badge = record
+        ? (record.stars >= 3 ? 'Gold' : record.stars === 2 ? 'Silver' : 'Bronze')
+        : 'New';
       
       const card = document.createElement('div');
       card.className = `level-card ${isUnlocked ? '' : 'locked'}`;
       card.innerHTML = `
-        <div class="level-title">${isUnlocked ? '' : '🔒 '} ${lvl.title}</div>
+        <div class="level-meta-left">
+          <div class="level-title">${isUnlocked ? '' : '🔒 '} ${lvl.title}</div>
+          <div class="level-stars">${this.renderStars(record?.stars || 0)}</div>
+          ${bestLine}
+        </div>
         <div class="level-meta-right">
+          <span class="level-badge">${badge}</span>
           <span class="level-diff">${lvl.difficulty}</span>
         </div>
       `;
@@ -671,7 +940,7 @@ class ArcadeEngine {
   }
 
   // --- Game Core --- //
-  loadLevel(level) {
+  loadLevel(level, options = {}) {
     this.endGame(); // clear timers
     this.state.level = level;
     this.state.foundWords.clear();
@@ -684,10 +953,17 @@ class ArcadeEngine {
     this.state.score = 0;
     this.state.combo = 0;
     this.state.comboMultiplier = 1;
+    this.state.maxCombo = 0;
     this.state.powers = { ...DEFAULT_POWERS };
     this.state.hintsUsed = 0;
     this.state.timerFrozen = false;
     this.state.activePower = null;
+    this.state.lastWinResult = null;
+    this.state.activeModifier = null;
+    this.state.isDailyRun = Boolean(options.isDailyRun);
+    this.state.scoreMultiplier = 1;
+    this.state.comboTimeoutMs = 5000;
+    this.applyModifierState(options.modifier || null);
     
     // Set timer based on difficulty
     const diff = level.difficulty.toLowerCase();
@@ -697,6 +973,10 @@ class ArcadeEngine {
     else this.state.timeLeft = 60;
 
     this.state.board = generateBoard(level.cols, level.rows, level.words);
+    const levelRecord = this.getLevelRecord(level.id);
+    document.getElementById('score-best').textContent = levelRecord?.bestScore
+      ? `PB ${levelRecord.bestScore} · ${levelRecord.stars}/3`
+      : 'New level';
     const actualCols = this.state.board.cols || level.cols;
     const actualRows = this.state.board.rows || level.rows;
     
@@ -718,6 +998,7 @@ class ArcadeEngine {
     this.updateScoreUI();
     this.updateTimerUI();
     this.updatePowerUpsUI();
+    this.updateModifierUI();
     this.updateSVG();
     
     this.switchScreen('game');
@@ -728,6 +1009,18 @@ class ArcadeEngine {
     );
     
     this.startTimer();
+
+    if (this.state.activeModifier?.key === 'frozen-start') {
+      this.state.timerFrozen = true;
+      this.updateTimerUI();
+      const frost = document.getElementById('frost-overlay');
+      if (frost) frost.classList.add('active');
+      this.state.timerFreezeTimeout = setTimeout(() => {
+        this.state.timerFrozen = false;
+        if (frost) frost.classList.remove('active');
+        this.updateTimerUI();
+      }, 12000);
+    }
   }
 
   endGame() {
@@ -794,7 +1087,7 @@ class ArcadeEngine {
   }
 
   addScore(points, triggerEl) {
-    const finalPoints = Math.floor(points * this.state.comboMultiplier);
+    const finalPoints = Math.floor(points * this.state.comboMultiplier * this.state.scoreMultiplier);
     this.state.score += finalPoints;
     this.updateScoreUI();
     
@@ -813,8 +1106,14 @@ class ArcadeEngine {
 
   registerFindScore(endTileEl) {
     this.state.combo++;
-    if (this.state.combo >= 3) this.state.comboMultiplier = 2;
-    else if (this.state.combo >= 2) this.state.comboMultiplier = 1.5;
+    this.state.maxCombo = Math.max(this.state.maxCombo, this.state.combo);
+    if (this.state.activeModifier?.key === 'combo-rush') {
+      if (this.state.combo >= 4) this.state.comboMultiplier = 3;
+      else if (this.state.combo >= 2) this.state.comboMultiplier = 2;
+    } else {
+      if (this.state.combo >= 3) this.state.comboMultiplier = 2;
+      else if (this.state.combo >= 2) this.state.comboMultiplier = 1.5;
+    }
     
     this.addScore(100, endTileEl);
     
@@ -823,7 +1122,7 @@ class ArcadeEngine {
       this.state.combo = 0;
       this.state.comboMultiplier = 1;
       this.updateScoreUI();
-    }, 5000);
+    }, this.state.comboTimeoutMs);
   }
 
   // --- Power-ups --- //
@@ -841,6 +1140,7 @@ class ArcadeEngine {
   }
 
   usePowerUp(power) {
+    if (this.state.activeModifier?.key === 'no-hints' && power === 'hint') return;
     if (this.state.powers[power] <= 0 || this.state.isDragging) return;
     
     // Direct action powers
@@ -1316,8 +1616,21 @@ class ArcadeEngine {
         
         // Calculate Bonuses
         const timeBonus = this.state.timeLeft * 10;
-        const noHintBonus = this.state.hintsUsed === 0 ? 200 : 0;
+        const noHintBonus = this.state.hintsUsed === 0
+          ? (this.state.activeModifier?.key === 'no-hints' ? 400 : 200)
+          : 0;
         const finalScore = this.state.score + timeBonus + noHintBonus + 500; // 500 perfect clear bonus
+        const result = {
+          finalScore,
+          timeLeft: this.state.timeLeft,
+          hintsUsed: this.state.hintsUsed,
+          maxCombo: this.state.maxCombo
+        };
+        result.stars = this.calculateArcadeStars(this.state.level, result);
+        const recordUpdate = this.recordLevelResult(this.state.level, result);
+        this.state.lastWinResult = { ...result, ...recordUpdate };
+        const category = CATEGORIES.find(cat => cat.levels.some(level => level.id === this.state.level.id));
+        const categoryProgress = category ? this.getCategoryProgress(category) : null;
         
         this.updateStats(true, finalScore);
         this.unlockNextLevel(this.state.level);
@@ -1341,6 +1654,23 @@ class ArcadeEngine {
             document.getElementById('wb-time').textContent = `+${timeBonus}`;
             document.getElementById('wb-nohint').textContent = `+${noHintBonus}`;
             document.getElementById('wb-total').textContent = finalScore;
+            document.getElementById('win-stars').innerHTML = this.renderStars(result.stars);
+            document.getElementById('win-best-score').textContent = this.state.lastWinResult.record.bestScore;
+            document.getElementById('win-best-combo').textContent = this.state.lastWinResult.record.bestCombo;
+            document.getElementById('win-record-note').textContent = this.state.lastWinResult.isNewBestScore
+              ? 'New high score!'
+              : this.state.lastWinResult.isNewStarRecord
+                ? 'New medal tier!'
+                : `Best stars: ${this.state.lastWinResult.record.stars}/3`;
+            document.getElementById('win-replay-prompt').textContent = this.getArcadeReplayLabel(this.state.lastWinResult.record);
+            document.getElementById('win-modifier-note').textContent = this.state.activeModifier
+              ? `Daily Modifier: ${this.state.activeModifier.name}`
+              : 'Standard arcade rules';
+            document.getElementById('win-collection-note').textContent = categoryProgress?.isPerfected
+              ? `${category.name} collection perfected`
+              : categoryProgress?.isComplete
+                ? `${category.name} collection mastered`
+                : '';
             
             this.switchScreen('win');
         }, 1200);

@@ -391,6 +391,7 @@ class GameEngine {
         board: null, // {grid, placedWords}
         foundWords: new Set(),
         tileWordCounts: {}, // tracks how many found words use each tile: "r,c" -> count
+        levelRecords: this.loadLevelRecords(),
         
         // Interaction state
         isDragging: false,
@@ -400,6 +401,11 @@ class GameEngine {
         activePointerId: null,
         pathHasCrossing: false, // true when swiping over already-selected tile
         svgLines: [], // permanently drawn lines for found words (full path arrays)
+        levelStartedAt: 0,
+        mistakeCount: 0,
+        idleHintsUsed: 0,
+        lastWinResult: null,
+        currentCategory: null,
         
         // Progress & Tutorial
         unlockedLevels: this.loadProgress(),
@@ -414,6 +420,7 @@ class GameEngine {
   initDOM() {
     this.screens = {
         menu: document.getElementById('menu-screen'),
+        collections: document.getElementById('collection-screen'),
         level: document.getElementById('level-screen'),
         game: document.getElementById('game-screen'),
         win: document.getElementById('win-screen')
@@ -425,6 +432,7 @@ class GameEngine {
     
     // UI elements
     this.catGrid = document.getElementById('category-grid');
+    this.collectionGrid = document.getElementById('collection-grid');
     this.lvlGrid = document.getElementById('level-grid');
     
     // Game elements
@@ -443,8 +451,13 @@ class GameEngine {
     // Merge: ensure every category has at least its first level unlocked
     const progress = { ...saved };
     CATEGORIES.forEach(cat => {
-      if (!progress[cat.slug] || !Array.isArray(progress[cat.slug]) || progress[cat.slug].length === 0) {
-        progress[cat.slug] = [cat.levels[0].id];
+      const firstLevelId = cat.levels[0]?.id;
+      if (!Array.isArray(progress[cat.slug])) {
+        progress[cat.slug] = firstLevelId != null ? [firstLevelId] : [];
+        return;
+      }
+      if (firstLevelId != null && !progress[cat.slug].includes(firstLevelId)) {
+        progress[cat.slug].unshift(firstLevelId);
       }
     });
     return progress;
@@ -460,6 +473,166 @@ class GameEngine {
 
   saveStats(stats) {
     localStorage.setItem('fillwords_stats', JSON.stringify(stats));
+  }
+
+  loadLevelRecords() {
+    try {
+      const saved = localStorage.getItem('fillwords_level_records');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {};
+  }
+
+  saveLevelRecords() {
+    localStorage.setItem('fillwords_level_records', JSON.stringify(this.state.levelRecords));
+  }
+
+  getLevelRecord(levelId) {
+    return this.state.levelRecords[levelId] || null;
+  }
+
+  formatDuration(totalSeconds) {
+    const safeSeconds = Math.max(0, Math.floor(totalSeconds || 0));
+    const minutes = Math.floor(safeSeconds / 60);
+    const seconds = safeSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  getNormalParTime(level) {
+    return Math.max(25, level.words.length * 9 + level.cols * level.rows * 1.2);
+  }
+
+  calculateNormalStars(level, result) {
+    let stars = 1;
+    if (result.idleHintsUsed === 0) stars = 2;
+    if (result.idleHintsUsed === 0 && result.mistakes === 0 && result.elapsedSeconds <= this.getNormalParTime(level)) {
+      stars = 3;
+    }
+    return stars;
+  }
+
+  recordLevelResult(level, result) {
+    const previous = this.getLevelRecord(level.id);
+    const updated = {
+      stars: Math.max(previous?.stars || 0, result.stars),
+      bestTime: previous?.bestTime != null ? Math.min(previous.bestTime, result.elapsedSeconds) : result.elapsedSeconds,
+      bestMistakes: previous?.bestMistakes != null ? Math.min(previous.bestMistakes, result.mistakes) : result.mistakes,
+      bestHintRun: previous?.bestHintRun != null ? Math.min(previous.bestHintRun, result.idleHintsUsed) : result.idleHintsUsed,
+      plays: (previous?.plays || 0) + 1,
+      lastPlayedAt: Date.now()
+    };
+
+    this.state.levelRecords[level.id] = updated;
+    this.saveLevelRecords();
+
+    return {
+      record: updated,
+      isNewBestTime: !previous || previous.bestTime == null || result.elapsedSeconds < previous.bestTime,
+      isNewStarRecord: result.stars > (previous?.stars || 0)
+    };
+  }
+
+  renderStars(count) {
+    return Array.from({ length: 3 }, (_, index) => {
+      const filled = index < count;
+      return `<span class="star-chip${filled ? ' filled' : ''}">${filled ? '★' : '☆'}</span>`;
+    }).join('');
+  }
+
+  getNormalReplayLabel(record) {
+    if (!record) return 'First Clear';
+    if (record.stars >= 3) return 'Perfect Run';
+    if (record.stars === 2) return 'Go For 3 Stars';
+    return 'Beat Your Best';
+  }
+
+  getCategoryProgress(cat) {
+    const totalLevels = cat.levels.length;
+    let completedLevels = 0;
+    let earnedStars = 0;
+    let perfectedLevels = 0;
+
+    cat.levels.forEach(level => {
+      const record = this.getLevelRecord(level.id);
+      if (record) {
+        completedLevels++;
+        earnedStars += record.stars || 0;
+        if ((record.stars || 0) >= 3) perfectedLevels++;
+      }
+    });
+
+    const totalStars = totalLevels * 3;
+    const isComplete = completedLevels === totalLevels;
+    const isPerfected = perfectedLevels === totalLevels && totalLevels > 0;
+    const masteryLabel = isPerfected ? 'Perfected' : isComplete ? 'Mastered' : 'In Progress';
+
+    return {
+      completedLevels,
+      totalLevels,
+      earnedStars,
+      totalStars,
+      perfectedLevels,
+      completionPct: Math.round((completedLevels / totalLevels) * 100),
+      isComplete,
+      isPerfected,
+      masteryLabel
+    };
+  }
+
+  getCategoryStatusNote(progress) {
+    if (progress.isPerfected) return 'Collection Perfected';
+    if (progress.isComplete) return 'Collection Mastered';
+    return `${progress.totalLevels - progress.completedLevels} levels left`;
+  }
+
+  renderCategoryMastery(progress) {
+    const pills = [];
+    pills.push(`<span class="mastery-pill">${progress.masteryLabel}</span>`);
+    pills.push(`<span class="mastery-pill subtle">${progress.perfectedLevels}/${progress.totalLevels} perfect</span>`);
+    pills.push(`<span class="mastery-pill subtle">${progress.earnedStars}/${progress.totalStars} stars</span>`);
+    return pills.join('');
+  }
+
+  renderCollectionShelf() {
+    this.switchScreen('collections');
+    this.collectionGrid.innerHTML = '';
+
+    CATEGORIES.forEach(cat => {
+      this.ensureCategoryUnlocked(cat);
+      const progress = this.getCategoryProgress(cat);
+      const card = document.createElement('button');
+      card.className = `collection-card ${progress.isPerfected ? 'perfected' : ''}`;
+      card.innerHTML = `
+        <div class="collection-top">
+          <div>
+            <div class="collection-title">${cat.emoji || '🔤'} ${cat.name}</div>
+            <div class="collection-status">${progress.masteryLabel}</div>
+          </div>
+          <div class="level-stars">${this.renderStars(Math.min(progress.perfectedLevels, 3))}</div>
+        </div>
+        <div class="cat-progress-bar"><span style="width:${progress.completionPct}%"></span></div>
+        <div class="collection-stats">
+          <span class="collection-stat">${progress.completedLevels}/${progress.totalLevels} cleared</span>
+          <span class="collection-stat">${progress.perfectedLevels}/${progress.totalLevels} perfect</span>
+          <span class="collection-stat">${progress.earnedStars}/${progress.totalStars} stars</span>
+        </div>
+      `;
+      card.addEventListener('click', () => {
+        this.sound.click();
+        this.renderLevelSelect(cat);
+      });
+      this.collectionGrid.appendChild(card);
+    });
+  }
+
+  ensureCategoryUnlocked(cat) {
+    if (!cat?.levels?.length) return;
+    if (!this.state.unlockedLevels[cat.slug]) this.state.unlockedLevels[cat.slug] = [];
+    const firstLevelId = cat.levels[0].id;
+    if (!this.state.unlockedLevels[cat.slug].includes(firstLevelId)) {
+      this.state.unlockedLevels[cat.slug].push(firstLevelId);
+      this.saveProgress();
+    }
   }
 
   updateStats(wordsFoundInLevel) {
@@ -524,14 +697,22 @@ class GameEngine {
   bindEvents() {
     // Nav buttons
     document.getElementById('back-to-menu').addEventListener('click', () => {
-        this.sound.click(); this.switchScreen('menu');
+        this.sound.click(); this.renderMenu();
+    });
+    document.getElementById('open-collection-shelf').addEventListener('click', () => {
+        this.sound.init(); this.sound.click(); this.renderCollectionShelf();
+    });
+    document.getElementById('back-from-collections').addEventListener('click', () => {
+        this.sound.click(); this.renderMenu();
     });
     document.getElementById('back-to-levels').addEventListener('click', () => {
-        this.sound.click(); this.switchScreen('level');
+        this.sound.click();
+        if (this.state.currentCategory) this.renderLevelSelect(this.state.currentCategory);
+        else this.renderMenu();
     });
     
     document.getElementById('back-to-menu-win').addEventListener('click', () => {
-        this.sound.click(); this.switchScreen('menu');
+        this.sound.click(); this.renderMenu();
     });
     document.getElementById('play-again').addEventListener('click', () => {
         this.sound.click(); this.loadLevel(this.state.level);
@@ -543,7 +724,7 @@ class GameEngine {
         if (idx < cat.levels.length - 1) {
             this.loadLevel(cat.levels[idx + 1]);
         } else {
-            this.switchScreen('menu');
+            this.renderMenu();
         }
     });
 
@@ -584,6 +765,8 @@ class GameEngine {
 
   // --- Rendering UI --- //
   renderMenu() {
+    this.state.currentCategory = null;
+    this.switchScreen('menu');
     // Populate inline stats
     const stats = this.loadStats();
     const el = (id) => document.getElementById(id);
@@ -612,12 +795,22 @@ class GameEngine {
     // Category pills
     this.catGrid.innerHTML = '';
     CATEGORIES.forEach(cat => {
+      this.ensureCategoryUnlocked(cat);
+      const progress = this.getCategoryProgress(cat);
       const pill = document.createElement('div');
-      pill.className = 'category-card';
+      pill.className = `category-card ${progress.isPerfected ? 'perfected' : ''}`;
       pill.innerHTML = `
         <div class="cat-body">
           <span class="cat-emoji">${cat.emoji || '🔤'}</span>
-          <span class="cat-name">${cat.name}</span>
+          <div class="cat-copy">
+            <span class="cat-name">${cat.name}</span>
+            <div class="cat-visuals">
+              <div class="cat-progress-bar"><span style="width:${progress.completionPct}%"></span></div>
+              <span class="cat-progress">${progress.completedLevels}/${progress.totalLevels}</span>
+              <span class="cat-stars-mini">${progress.earnedStars}/${progress.totalStars}★</span>
+            </div>
+            <span class="cat-mastery-badge">${this.getCategoryStatusNote(progress)}</span>
+          </div>
         </div>
       `;
       pill.addEventListener('click', () => {
@@ -630,22 +823,40 @@ class GameEngine {
   }
 
   renderLevelSelect(cat) {
+    this.ensureCategoryUnlocked(cat);
+    this.state.currentCategory = cat;
+    const progress = this.getCategoryProgress(cat);
     document.getElementById('level-cat-name').textContent = `${cat.emoji || ''} ${cat.name}`;
+    document.getElementById('level-cat-desc').textContent = `${progress.completedLevels}/${progress.totalLevels} cleared · ${progress.earnedStars}/${progress.totalStars} stars`;
+    document.getElementById('level-cat-mastery').innerHTML = this.renderCategoryMastery(progress);
     this.lvlGrid.innerHTML = '';
     
     cat.levels.forEach((lvl, idx) => {
       const isUnlocked = this.state.unlockedLevels[cat.slug]?.includes(lvl.id);
+      const record = this.getLevelRecord(lvl.id);
+      const stars = record?.stars || 0;
+      const bestLine = record?.bestTime != null
+        ? `<div class="level-best">Best ${this.formatDuration(record.bestTime)}</div>`
+        : '<div class="level-best">Unplayed</div>';
+      const badge = record
+        ? (record.stars >= 3 ? 'Perfect' : record.stars === 2 ? 'Clean' : 'Best')
+        : 'New';
       
       const card = document.createElement('div');
       card.className = `level-card ${isUnlocked ? '' : 'locked'}`;
       card.innerHTML = `
-        <div class="level-title">
-          ${isUnlocked ? '' : '🔒 '}
-          ${lvl.title}
-        </div>
-        <div class="level-meta-right">
-          <span class="level-diff">${lvl.difficulty}</span>
-        </div>
+        <div class="level-meta-left">
+          <div class="level-title">
+            ${isUnlocked ? '' : '🔒 '}
+            ${lvl.title}
+          </div>
+          <div class="level-stars">${this.renderStars(stars)}</div>
+          ${bestLine}
+         </div>
+         <div class="level-meta-right">
+           <span class="level-badge">${badge}</span>
+           <span class="level-diff">${lvl.difficulty}</span>
+         </div>
       `;
       
       if (isUnlocked) {
@@ -668,6 +879,10 @@ class GameEngine {
     this.state.tileWordCounts = {};
     this.state.currentDirection = null;
     this.state.activePointerId = null;
+    this.state.levelStartedAt = Date.now();
+    this.state.mistakeCount = 0;
+    this.state.idleHintsUsed = 0;
+    this.state.lastWinResult = null;
     this.state.board = generateBoard(level.cols, level.rows, level.words);
     
     // Use actual board dimensions (may be auto-expanded for long words)
@@ -675,6 +890,10 @@ class GameEngine {
     const actualRows = this.state.board.rows || level.rows;
     
     document.getElementById('game-level-title').textContent = level.title;
+    const levelRecord = this.getLevelRecord(level.id);
+    document.getElementById('game-level-best').textContent = levelRecord?.bestTime != null
+      ? `Best ${this.formatDuration(levelRecord.bestTime)} · ${levelRecord.stars}/3 stars`
+      : 'New level';
     
     // Setup Grid UI
     this.gridEl.style.gridTemplateColumns = `repeat(${actualCols}, 1fr)`;
@@ -780,6 +999,7 @@ class GameEngine {
     // Find its positions
     const wordObj = this.state.board.placedWords.find(pw => pw.word === missingWord);
     if (wordObj && wordObj.positions.length > 0) {
+        this.state.idleHintsUsed++;
         // Shake the first letter
         const startPos = wordObj.positions[0];
         const el = this.getTileElement(startPos.r, startPos.c);
@@ -958,7 +1178,10 @@ class GameEngine {
         
         this.checkWin();
     } else {
-        if(this.state.currentPath.length > 1) this.sound.error();
+        if(this.state.currentPath.length > 1) {
+          this.sound.error();
+          this.state.mistakeCount++;
+        }
     }
     
     // Reset selection
@@ -1036,6 +1259,18 @@ class GameEngine {
 
   checkWin() {
     if (this.state.foundWords.size === this.state.level.words.length) {
+        const elapsedSeconds = (Date.now() - this.state.levelStartedAt) / 1000;
+        const result = {
+          elapsedSeconds,
+          mistakes: this.state.mistakeCount,
+          idleHintsUsed: this.state.idleHintsUsed
+        };
+        result.stars = this.calculateNormalStars(this.state.level, result);
+        const recordUpdate = this.recordLevelResult(this.state.level, result);
+        this.state.lastWinResult = { ...result, ...recordUpdate };
+        const category = CATEGORIES.find(cat => cat.levels.some(level => level.id === this.state.level.id));
+        const categoryProgress = category ? this.getCategoryProgress(category) : null;
+
         // Save stats
         this.updateStats(this.state.foundWords.size);
         // Unlock next level
@@ -1058,6 +1293,22 @@ class GameEngine {
             this.confetti.burst(150);
             
             document.getElementById('win-words-found').textContent = this.state.foundWords.size;
+            document.getElementById('win-time').textContent = this.formatDuration(result.elapsedSeconds);
+            document.getElementById('win-mistakes').textContent = this.state.mistakeCount;
+            document.getElementById('win-hints').textContent = this.state.idleHintsUsed;
+            document.getElementById('win-best-time').textContent = this.formatDuration(this.state.lastWinResult.record.bestTime);
+            document.getElementById('win-stars').innerHTML = this.renderStars(result.stars);
+            document.getElementById('win-record-note').textContent = this.state.lastWinResult.isNewBestTime
+              ? 'New best time!'
+              : this.state.lastWinResult.isNewStarRecord
+                ? 'New star rating!'
+                : `Best stars: ${this.state.lastWinResult.record.stars}/3`;
+            document.getElementById('win-collection-note').textContent = categoryProgress?.isPerfected
+              ? `${category.name} collection perfected`
+              : categoryProgress?.isComplete
+                ? `${category.name} collection mastered`
+                : '';
+            document.getElementById('win-replay-prompt').textContent = this.getNormalReplayLabel(this.state.lastWinResult.record);
             this.switchScreen('win');
         }, 1200);
     }

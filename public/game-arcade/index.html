@@ -35,8 +35,9 @@
         </div>
 
         <button class="arcade-play-btn" id="potd-play-btn">
-          <span class="arcade-play-label" id="potd-title">▶ Start Playing</span>
+          <span class="arcade-play-label" id="potd-title">Daily Challenge</span>
           <span class="arcade-play-meta" id="potd-meta"></span>
+          <span class="arcade-play-modifier" id="potd-modifier"></span>
         </button>
 
         <div class="menu-stats">
@@ -47,6 +48,8 @@
           <div class="menu-stat"><span class="menu-stat-val" id="stat-streak">0</span> streak</div>
         </div>
 
+        <button id="open-collection-shelf" class="menu-secondary-btn">Trophy Shelf</button>
+
         <div class="menu-divider">
           <span class="menu-divider-line"></span>
           <span class="menu-divider-text">browse categories</span>
@@ -55,6 +58,22 @@
 
         <div id="category-grid" class="menu-cats"></div>
       </div>
+    </div>
+
+    <div id="collection-screen" class="screen">
+      <div class="screen-topbar">
+        <button id="back-from-collections" class="back-btn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          Menu
+        </button>
+      </div>
+      <div class="level-screen-header">
+        <h2>Trophy Shelf</h2>
+        <p class="level-cat-desc">Track every mastered and perfected arcade collection</p>
+      </div>
+      <div id="collection-grid" class="collection-grid"></div>
     </div>
 
     <!-- ========== LEVEL SELECT ========== -->
@@ -71,6 +90,7 @@
       <div class="level-screen-header">
         <h2 id="level-cat-name"></h2>
         <p class="level-cat-desc">Select a puzzle</p>
+        <div id="level-cat-mastery" class="level-cat-mastery"></div>
       </div>
       <div id="level-grid" class="level-grid"></div>
     </div>
@@ -88,6 +108,7 @@
         <div class="score-display">
           <span class="score-label">SCORE</span>
           <span class="score-value" id="score-value">0</span>
+          <span class="score-best" id="score-best">New level</span>
         </div>
         <div class="combo-display" id="combo-display" style="display:none;">
           <span class="combo-text" id="combo-text">×2</span>
@@ -105,6 +126,7 @@
       <div class="game-layout-arcade">
         <!-- Progress bar (hidden words) -->
         <div class="progress-panel">
+          <div id="daily-modifier-banner" class="daily-modifier-banner" hidden></div>
           <div id="progress-dots" class="progress-dots"></div>
           <span class="progress-count" id="progress-count">0 / 0</span>
         </div>
@@ -238,12 +260,21 @@
           </svg>
         </div>
         <div class="win-title-arcade">Level Clear!</div>
+        <div id="win-stars" class="win-stars" aria-label="Level medals"></div>
+        <div id="win-record-note" class="win-record-note">Clean run!</div>
         <div class="win-breakdown">
           <div class="wb-row"><span>Words</span><span id="wb-words">0</span></div>
           <div class="wb-row"><span>Time Bonus</span><span id="wb-time">0</span></div>
           <div class="wb-row"><span>No-Hint Bonus</span><span id="wb-nohint">0</span></div>
           <div class="wb-row wb-total"><span>Total</span><span id="wb-total">0</span></div>
         </div>
+        <div class="win-meta-grid">
+          <div class="win-meta-card"><span class="win-meta-label">Best Score</span><span id="win-best-score" class="win-meta-value">0</span></div>
+          <div class="win-meta-card"><span class="win-meta-label">Best Chain</span><span id="win-best-combo" class="win-meta-value">1</span></div>
+        </div>
+        <div id="win-collection-note" class="win-collection-note"></div>
+        <div id="win-modifier-note" class="win-modifier-note">Standard arcade rules</div>
+        <div id="win-replay-prompt" class="win-replay-prompt">Push for a stronger run.</div>
         <div class="win-actions-arcade">
           <button id="next-level" class="btn-arcade btn-primary-arcade">Next Level</button>
           <button id="play-again" class="btn-arcade btn-outline-arcade">Replay</button>

@@ -48,6 +48,8 @@
           <div class="menu-stat"><span class="menu-stat-val" id="stat-streak">0</span> streak</div>
         </div>
 
+        <button id="open-collection-shelf" class="menu-secondary-btn">Collection Shelf</button>
+
         <!-- Divider -->
         <div class="menu-divider">
           <span class="menu-divider-line"></span>
@@ -60,6 +62,22 @@
 
       </div>
 
+    </div>
+
+    <div id="collection-screen" class="screen">
+      <div class="screen-topbar">
+        <button id="back-from-collections" class="back-btn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          Menu
+        </button>
+      </div>
+      <div class="level-screen-header">
+        <h2>Collection Shelf</h2>
+        <p class="level-cat-desc">Browse every mastered and perfected set</p>
+      </div>
+      <div id="collection-grid" class="collection-grid"></div>
     </div>
 
     <!-- Level Select -->
@@ -76,6 +94,7 @@
       <div class="level-screen-header">
         <h2 id="level-cat-name"></h2>
         <p id="level-cat-desc" class="level-cat-desc">Select a puzzle size</p>
+        <div id="level-cat-mastery" class="level-cat-mastery"></div>
       </div>
       <div id="level-grid" class="level-grid"></div>
     </div>
@@ -92,6 +111,7 @@
         </button>
         <div class="game-info">
           <span id="game-level-title" class="game-level-title"></span>
+          <span id="game-level-best" class="game-level-best"></span>
         </div>
         <button id="sound-toggle-game" class="sound-toggle icon-only" aria-label="Toggle sound">
           <svg id="sound-icon-game" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -146,9 +166,19 @@
           </svg>
         </div>
         <div class="win-title">Level Complete!</div>
+        <div id="win-stars" class="win-stars" aria-label="Level stars"></div>
+        <div id="win-record-note" class="win-record-note">Great solve!</div>
         <div class="win-stats">
           <span id="win-words-found" class="win-stat-value">0</span> words found
         </div>
+        <div class="win-summary-grid">
+          <div class="win-summary-card"><span class="win-summary-label">Time</span><span id="win-time" class="win-summary-value">0:00</span></div>
+          <div class="win-summary-card"><span class="win-summary-label">Mistakes</span><span id="win-mistakes" class="win-summary-value">0</span></div>
+          <div class="win-summary-card"><span class="win-summary-label">Hints</span><span id="win-hints" class="win-summary-value">0</span></div>
+          <div class="win-summary-card"><span class="win-summary-label">Best Time</span><span id="win-best-time" class="win-summary-value">0:00</span></div>
+        </div>
+        <div id="win-collection-note" class="win-collection-note"></div>
+        <div id="win-replay-prompt" class="win-replay-prompt">Beat your best next run.</div>
         <div class="win-actions">
           <button id="next-level" class="btn-game btn-primary-game">Next Level</button>
           <button id="play-again" class="btn-game btn-outline-game">Play Again</button>
