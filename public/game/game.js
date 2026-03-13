@@ -370,6 +370,37 @@ function generateBoard(cols, rows, words, layoutHint = {}) {
     return candidates[Math.floor(Math.random() * topN)];
   }
 
+  function compactBoard(result) {
+    const allPositions = result.placedWords.flatMap(placedWord => placedWord.positions);
+    if (!allPositions.length) return result;
+
+    const minRow = Math.min(...allPositions.map(pos => pos.r));
+    const maxRow = Math.max(...allPositions.map(pos => pos.r));
+    const minCol = Math.min(...allPositions.map(pos => pos.c));
+    const maxCol = Math.max(...allPositions.map(pos => pos.c));
+
+    const croppedGrid = [];
+    for (let r = minRow; r <= maxRow; r++) {
+      croppedGrid.push(result.grid[r].slice(minCol, maxCol + 1));
+    }
+
+    const croppedWords = result.placedWords.map(placedWord => ({
+      ...placedWord,
+      positions: placedWord.positions.map(pos => ({
+        r: pos.r - minRow,
+        c: pos.c - minCol
+      }))
+    }));
+
+    return {
+      ...result,
+      grid: croppedGrid,
+      placedWords: croppedWords,
+      rows: croppedGrid.length,
+      cols: croppedGrid[0]?.length || 0
+    };
+  }
+
   for (const candidate of getLayoutCandidates()) {
     const effectiveCols = candidate.cols;
     const effectiveRows = candidate.rows;
@@ -390,17 +421,21 @@ function generateBoard(cols, rows, words, layoutHint = {}) {
       continue;
     }
 
+    result = compactBoard(result);
+    const compactRows = result.rows;
+    const compactCols = result.cols;
+
     const FILL = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    for (let r = 0; r < effectiveRows; r++) {
-      for (let c = 0; c < effectiveCols; c++) {
+    for (let r = 0; r < compactRows; r++) {
+      for (let c = 0; c < compactCols; c++) {
         if (result.grid[r][c] === '') {
           result.grid[r][c] = FILL[Math.floor(Math.random() * FILL.length)];
         }
       }
     }
 
-    result.cols = effectiveCols;
-    result.rows = effectiveRows;
+    result.cols = compactCols;
+    result.rows = compactRows;
     return result;
   }
 
