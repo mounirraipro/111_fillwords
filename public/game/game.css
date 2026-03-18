@@ -752,10 +752,11 @@ body {
 #game-screen { background: transparent; }
 
 .game-toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.25rem;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
   border-bottom: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(16px);
@@ -764,23 +765,56 @@ body {
   flex-shrink: 0;
 }
 
-.game-info { flex: 1; text-align: center; }
+.game-toolbar .back-btn,
+.game-toolbar .sound-toggle {
+  margin-top: 0;
+  min-height: 38px;
+}
+
+.game-toolbar .back-btn {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+.game-toolbar .sound-toggle.icon-only {
+  padding: 0.45rem 0.55rem;
+}
+
+.game-info {
+  min-width: 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.08rem;
+  line-height: 1.05;
+}
 
 .game-level-title {
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: 0.94rem;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.01em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .game-level-best {
   display: block;
-  margin-top: 0.12rem;
-  font-size: 0.72rem;
+  margin-top: 0;
+  font-size: 0.64rem;
   font-weight: 700;
   color: var(--text-secondary);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Word List Top Tray ── */
@@ -852,6 +886,10 @@ body {
 }
 
 #board-container {
+  --tile-size-base: 48px;
+  --tile-font-size-base: 21px;
+  --board-gap-base: 7px;
+  --board-padding-base: 16px;
   --tile-size: 48px;
   --tile-font-size: 21px;
   --board-gap: 7px;
@@ -867,6 +905,8 @@ body {
   user-select: none;
   touch-action: none;
   box-sizing: border-box;
+  width: fit-content;
+  height: fit-content;
   max-width: 100%;
   max-height: 100%;
 }
@@ -881,6 +921,7 @@ body {
 .letter-tile {
   width: var(--tile-size);
   height: var(--tile-size);
+  box-sizing: border-box;
   background: var(--tile-bg);
   border: 2px solid var(--tile-border);
   border-radius: var(--radius-md);
@@ -1293,6 +1334,24 @@ body {
 }
 
 @media (max-width: 480px) {
+  .game-toolbar {
+    padding: 0.4rem 0.55rem;
+    gap: 0.35rem;
+  }
+
+  .game-toolbar .back-btn {
+    padding: 0.42rem 0.55rem;
+    min-width: 0;
+  }
+
+  .game-level-title {
+    font-size: 0.86rem;
+  }
+
+  .game-level-best {
+    font-size: 0.58rem;
+  }
+
   .menu-center {
     padding-inline: 1rem;
   }
@@ -1343,6 +1402,14 @@ body {
 }
 
 @media (max-width: 360px) {
+  .game-toolbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .game-toolbar .back-btn {
+    font-size: 0.72rem;
+  }
+
   .menu-center {
     padding-inline: 0.85rem;
   }

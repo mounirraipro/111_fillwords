@@ -449,6 +449,13 @@ h3 { font-size: 1.05rem; font-weight: 600; }
   max-width: 720px;
 }
 
+.hero-content-wide {
+  width: min(1280px, calc(100vw - 2rem));
+  max-width: none;
+  margin: 0 auto;
+  padding-inline: 0;
+}
+
 .hero-content h1 {
   font-size: clamp(2rem, 5.5vw, 3.5rem);
   font-weight: 800;
@@ -589,14 +596,14 @@ h3 { font-size: 1.05rem; font-weight: 600; }
 }
 
 .hero-with-game .hero-content {
-  max-width: 900px;
+  max-width: 1180px;
 }
 
 .hero-game-wrapper {
   width: 100%;
-  max-width: 800px;
+  max-width: 1280px;
   margin: 0 auto;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 13;
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border-hover);
@@ -605,6 +612,10 @@ h3 { font-size: 1.05rem; font-weight: 600; }
 }
 
 @media (max-width: 768px) {
+  .hero-content-wide {
+    width: min(100%, calc(100vw - 2rem));
+  }
+
   .hero-game-wrapper {
     aspect-ratio: 9 / 14;
     border-radius: var(--radius-md);

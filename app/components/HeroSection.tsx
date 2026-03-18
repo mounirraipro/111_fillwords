@@ -81,14 +81,14 @@ export default function HeroSection() {
             <div className="hero-grid-overlay" />
 
             {/* ── Content ── */}
-            <div className="container hero-content" style={{ maxWidth: '1000px' }}>
+            <div className="hero-content hero-content-wide">
                 {/* ── Embedded Game ── */}
                 <div
                     className="hero-game-wrapper"
                     ref={gameRef}
                     style={{
                         width: '100%',
-                        maxWidth: '960px',
+                        maxWidth: '1280px',
                         background: '#f0f7fa',
                         border: '2px solid rgba(14, 116, 144, 0.25)',
                         borderRadius: '16px',

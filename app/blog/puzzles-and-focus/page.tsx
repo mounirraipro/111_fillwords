@@ -101,6 +101,7 @@ export default function PuzzlesAndFocusPost() {
                 <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid var(--border)' }}>
                     <h3>Read More</h3>
                     <ul>
+                        <li><Link href="/blog/how-to-build-a-daily-fillwords-habit-that-actually-sticks">How to Build a Daily Fillwords Habit That Actually Sticks</Link></li>
                         <li><Link href="/blog/neuroscience-of-puzzle-solving">The Neuroscience of Puzzle Solving</Link></li>
                         <li><Link href="/blog/benefits-of-puzzle-games">7 Brain Benefits of Playing Puzzle Games</Link></li>
                         <li><Link href="/blog/mindfulness-and-puzzles">Mindfulness and Puzzles: How Games Create Flow States</Link></li>

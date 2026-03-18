@@ -80,6 +80,7 @@ export default function Post() {
                 <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid var(--border)' }}>
                     <h3>Read More</h3>
                     <ul>
+                        <li><Link href="/blog/how-expert-fillwords-players-scan-a-grid-and-find-words-faster">How Expert Fillwords Players Scan a Grid and Find Words Faster</Link></li>
                         <li><Link href="/blog/the-ultimate-strategy-guide-to-mastering-fillwords">The Ultimate Strategy Guide</Link></li>
                         <li><Link href="/blog/tips-and-tricks">Pro Tips & Tricks</Link></li>
                     </ul>

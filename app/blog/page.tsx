@@ -6,6 +6,24 @@ import AdSlot from '../components/AdSlot';
 
 const posts = [
     {
+        slug: 'how-expert-fillwords-players-scan-a-grid-and-find-words-faster',
+        title: 'How Expert Fillwords Players Scan a Grid and Find Words Faster',
+        excerpt: 'Learn the visual scanning habits expert FillWords players use to find patterns, reduce dead time, and move through word grids with more speed and confidence.',
+        icon: '⚡',
+        date: 'March 31, 2026',
+        readTime: '12 min read',
+        category: 'Strategy',
+    },
+    {
+        slug: 'how-to-build-a-daily-fillwords-habit-that-actually-sticks',
+        title: 'How to Build a Daily Fillwords Habit That Actually Sticks',
+        excerpt: 'A practical guide to turning FillWords into a realistic daily routine that supports focus, memory, and stress relief without relying on motivation alone.',
+        icon: '🗓️',
+        date: 'March 30, 2026',
+        readTime: '12 min read',
+        category: 'Lifestyle',
+    },
+    {
         slug: 'the-ultimate-strategy-guide-to-mastering-fillwords',
         title: 'The Ultimate Strategy Guide to Mastering Fillwords',
         excerpt: 'Learn the best strategies, tips, and techniques to conquer FillWords. Discover how to identify patterns, use process of elimination, and build an unbeatable vocabulary.',

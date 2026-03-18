@@ -202,6 +202,15 @@ function generateBoard(cols, rows, words, layoutHint = {}) {
     return candidates;
   }
 
+  function scoreLayout(result) {
+    const targetAspect = Math.max(layoutHint.aspectRatio || 1, 0.1);
+    const boardAspect = Math.max((result.cols || 1) / Math.max(result.rows || 1, 1), 0.1);
+    const aspectPenalty = Math.abs(Math.log(boardAspect / targetAspect));
+    const areaPenalty = (result.cols || 0) * (result.rows || 0);
+    const expansionPenalty = Math.max(0, (result.cols || 0) - cols) + Math.max(0, (result.rows || 0) - rows);
+    return areaPenalty * 10 + aspectPenalty * 50 + expansionPenalty * 5;
+  }
+
   function shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -397,6 +406,9 @@ function generateBoard(cols, rows, words, layoutHint = {}) {
     return candidates[Math.floor(Math.random() * topN)];
   }
 
+  let bestResult = null;
+  let bestScore = Infinity;
+
   for (const candidate of getLayoutCandidates()) {
     const effectiveCols = candidate.cols;
     const effectiveRows = candidate.rows;
@@ -428,7 +440,16 @@ function generateBoard(cols, rows, words, layoutHint = {}) {
 
     result.cols = effectiveCols;
     result.rows = effectiveRows;
-    return result;
+
+    const score = scoreLayout(result);
+    if (score < bestScore) {
+      bestScore = score;
+      bestResult = result;
+    }
+  }
+
+  if (bestResult) {
+    return bestResult;
   }
 
   throw new Error('Unable to generate board layout');
@@ -610,25 +631,35 @@ class ArcadeEngine {
     if (!cols || !rows) return;
 
     const styles = getComputedStyle(this.boardContainer);
-    const baseTileSize = parseFloat(styles.getPropertyValue('--tile-size')) || 46;
-    const baseFontSize = parseFloat(styles.getPropertyValue('--tile-font-size')) || 19;
-    const baseGap = parseFloat(styles.getPropertyValue('--board-gap')) || 6;
-    const basePadding = parseFloat(styles.getPropertyValue('--board-padding')) || 16;
+    const baseTileSize = parseFloat(styles.getPropertyValue('--tile-size-base')) || 46;
+    const baseFontSize = parseFloat(styles.getPropertyValue('--tile-font-size-base')) || 19;
+    const baseGap = parseFloat(styles.getPropertyValue('--board-gap-base')) || 6;
+    const basePadding = parseFloat(styles.getPropertyValue('--board-padding-base')) || 16;
 
     const viewportWidth = window.visualViewport?.width || window.innerWidth;
     const viewportHeight = window.visualViewport?.height || window.innerHeight;
-    const availableWidth = Math.min(this.boardPanel.clientWidth, viewportWidth) - 2;
-    const availableHeight = Math.min(this.boardPanel.clientHeight, viewportHeight) - 2;
+    const safetyBuffer = 12;
+    const availableWidth = Math.max(0, Math.min(this.boardPanel.clientWidth, viewportWidth) - safetyBuffer);
+    const availableHeight = Math.max(0, Math.min(this.boardPanel.clientHeight, viewportHeight) - safetyBuffer);
 
-    const boardWidth = cols * baseTileSize + Math.max(0, cols - 1) * baseGap + basePadding * 2;
-    const boardHeight = rows * baseTileSize + Math.max(0, rows - 1) * baseGap + basePadding * 2;
+    const boardWidth = cols * baseTileSize + Math.max(0, cols - 1) * baseGap + basePadding * 2 + 4;
+    const boardHeight = rows * baseTileSize + Math.max(0, rows - 1) * baseGap + basePadding * 2 + 4;
     const scale = Math.min(1, availableWidth / boardWidth, availableHeight / boardHeight);
     const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
 
-    this.boardContainer.style.setProperty('--tile-size', `${baseTileSize * safeScale}px`);
-    this.boardContainer.style.setProperty('--tile-font-size', `${Math.max(9, baseFontSize * safeScale)}px`);
-    this.boardContainer.style.setProperty('--board-gap', `${baseGap * safeScale}px`);
-    this.boardContainer.style.setProperty('--board-padding', `${basePadding * safeScale}px`);
+    const scaledTileSize = baseTileSize * safeScale;
+    const scaledFontSize = Math.max(9, baseFontSize * safeScale);
+    const scaledGap = baseGap * safeScale;
+    const scaledPadding = basePadding * safeScale;
+    const scaledWidth = cols * scaledTileSize + Math.max(0, cols - 1) * scaledGap + scaledPadding * 2 + 4;
+    const scaledHeight = rows * scaledTileSize + Math.max(0, rows - 1) * scaledGap + scaledPadding * 2 + 4;
+
+    this.boardContainer.style.setProperty('--tile-size', `${scaledTileSize}px`);
+    this.boardContainer.style.setProperty('--tile-font-size', `${scaledFontSize}px`);
+    this.boardContainer.style.setProperty('--board-gap', `${scaledGap}px`);
+    this.boardContainer.style.setProperty('--board-padding', `${scaledPadding}px`);
+    this.boardContainer.style.width = `${scaledWidth}px`;
+    this.boardContainer.style.height = `${scaledHeight}px`;
   }
 
   getBoardLayoutHint(level) {

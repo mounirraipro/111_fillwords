@@ -101,6 +101,7 @@ export default function PatternRecognitionPost() {
                 <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid var(--border)' }}>
                     <h3>Read More</h3>
                     <ul>
+                        <li><Link href="/blog/how-expert-fillwords-players-scan-a-grid-and-find-words-faster">How Expert Fillwords Players Scan a Grid and Find Words Faster</Link></li>
                         <li><Link href="/blog/tips-and-tricks">Pro Tips &amp; Tricks to Master FillWords</Link></li>
                         <li><Link href="/blog/neuroscience-of-puzzle-solving">The Neuroscience of Puzzle Solving</Link></li>
                         <li><Link href="/blog/puzzles-and-focus">How Puzzles Improve Focus and Attention</Link></li>
